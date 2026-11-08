@@ -1,0 +1,342 @@
+.login-page {
+    max-width: none;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(420px, .95fr);
+    margin: 0;
+    padding: 0;
+    background: var(--canvas);
+}
+
+/* Mengubah warna teks dan latar belakang saat autofill aktif */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    /* Ganti #ffffff dengan warna latar belakang input yang Anda inginkan */
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+
+    /* Ganti #333333 dengan warna teks input yang Anda inginkan */
+    -webkit-text-fill-color: #333333 !important;
+}
+
+.login-showcase {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow: hidden;
+    padding: 42px clamp(28px, 6vw, 92px);
+    color: white;
+    background: var(--navy);
+}
+
+.login-showcase::before, .login-showcase::after {
+    content: "";
+    position: absolute;
+    border: 1px solid #ffffff16;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.login-showcase::before {
+    width: 520px;
+    height: 520px;
+    right: -230px;
+    bottom: -220px;
+}
+
+.login-showcase::after {
+    width: 300px;
+    height: 300px;
+    left: -180px;
+    top: 32%;
+}
+
+.login-brand {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.login-brand-mark {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 12px;
+    background: white;
+    box-shadow: 0 8px 20px #09132d55;
+}
+
+.login-brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.login-brand strong, .login-brand small {
+    display: block;
+    line-height: 1.1;
+}
+
+.login-brand strong {
+    font-size: 18px;
+    letter-spacing: .09em;
+}
+
+.login-brand small {
+    margin-top: 4px;
+    color: #aebbd8;
+    font-size: 10px;
+}
+
+.login-showcase-content {
+    position: relative;
+    z-index: 1;
+    max-width: 500px;
+    margin: auto 0;
+}
+
+.login-showcase-content .eyebrow {
+    color: #91a9ef;
+}
+
+.login-showcase-content h1 {
+    max-width: 460px;
+    margin: 8px 0 14px;
+    font-size: clamp(32px, 4vw, 52px);
+    line-height: 1.08;
+    letter-spacing: -.035em;
+}
+
+.login-showcase-content > p:not(.eyebrow) {
+    max-width: 430px;
+    margin: 0;
+    color: #b9c6e3;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.login-illustration {
+    position: relative;
+    width: 118px;
+    height: 118px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 30px;
+    border: 1px solid #ffffff24;
+    border-radius: 32px;
+    color: #b9c9ff;
+    background: #ffffff0d;
+    box-shadow: 0 18px 40px #09132d33;
+}
+
+.login-illustration::before {
+    content: "";
+    position: absolute;
+    inset: 13px;
+    border: 1px dashed #ffffff2e;
+    border-radius: 24px;
+}
+
+.login-illustration-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #70d6a4;
+}
+
+.login-dot-one {
+    top: 16px;
+    right: 20px;
+}
+
+.login-dot-two {
+    bottom: 20px;
+    left: 18px;
+    width: 6px;
+    height: 6px;
+    background: #8c7cf6;
+}
+
+.login-dot-three {
+    right: 9px;
+    bottom: 31px;
+    width: 5px;
+    height: 5px;
+    background: #f0b957;
+}
+
+.login-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin-top: 28px;
+}
+
+.login-features span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 11px;
+    border: 1px solid #ffffff1f;
+    border-radius: 8px;
+    color: #d8e0f4;
+    background: #ffffff0b;
+    font-size: 11px;
+}
+
+.login-features svg {
+    color: #8faaff;
+}
+
+.login-showcase-footer {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: #7181a1;
+    font-size: 10px;
+}
+
+.login-form-area {
+    display: grid;
+    place-items: center;
+    padding: 32px clamp(20px, 5vw, 80px);
+}
+
+.login-card {
+    width: min(410px, 100%);
+    padding: 0;
+}
+
+.login-form-heading {
+    margin-bottom: 30px;
+}
+
+.login-mobile-mark {
+    display: none;
+}
+
+.login-mobile-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.login-form-heading .eyebrow {
+    margin-bottom: 10px;
+    color: var(--blue);
+}
+
+.login-form-heading h2 {
+    margin: 0 0 8px;
+    color: var(--ink);
+    font-size: 28px;
+    letter-spacing: -.025em;
+}
+
+.login-form-heading > p:last-child {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.login-fields {
+    display: grid;
+    gap: 18px;
+}
+
+.login-fields label {
+    display: grid;
+    gap: 7px;
+    color: #53617a;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.login-input-wrap {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid #d9dfeb;
+    border-radius: 9px;
+    background: var(--surface);
+    transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.login-input-wrap:focus-within {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px #315efb18;
+}
+
+.login-input-wrap > svg {
+    flex: 0 0 auto;
+    color: #9aa6ba;
+}
+
+.login-input-wrap input {
+    min-width: 0;
+    min-height: 46px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+}
+
+.login-input-wrap input:focus {
+    box-shadow: none;
+}
+
+.login-password-toggle {
+    flex: 0 0 auto;
+    min-width: 32px;
+    min-height: 32px;
+    color: #8d9ab0;
+}
+
+.login-password-toggle:hover:not(:disabled) {
+    color: var(--blue);
+    background: #eef3ff;
+}
+
+.login-error {
+    margin: 16px 0 0;
+    padding: 10px 12px;
+    border: 1px solid #f3c2c2;
+    border-radius: 8px;
+    color: #b42318;
+    background: #fff6f6;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.login-submit {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 24px;
+    border-radius: 9px;
+    font-size: 13px;
+}
+
+.login-submit .loading-spinner {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+    border-color: #ffffff66;
+    border-top-color: white;
+}
+
+.login-help {
+    margin: 17px 0 0;
+    color: #98a2b5;
+    font-size: 10px;
+    text-align: center;
+}
+

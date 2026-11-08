@@ -1,0 +1,372 @@
+.attendance-page {
+    display: grid;
+    gap: 18px;
+}
+
+.scan-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 360px) auto;
+    align-items: center;
+    gap: 13px;
+    background: #eef3ff;
+    border: 1px solid #dce5ff;
+    border-radius: 13px;
+    padding: 15px;
+    min-width: 0;
+}
+
+.scan-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    color: var(--blue);
+    background: white;
+}
+
+.scan-copy {
+    min-width: 0;
+}
+
+.scan-copy strong, .scan-copy span {
+    display: block;
+}
+
+.scan-copy strong {
+    font-size: 13px;
+}
+
+.scan-copy span {
+    color: #7181a1;
+    font-size: 10px;
+    margin-top: 4px;
+}
+
+.scan-input-group {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+}
+
+.scan-input-group input {
+    min-width: 0;
+    max-width: none;
+    border-radius: 8px 0 0 8px;
+}
+
+.scan-suffix-button {
+    min-width: 46px;
+    margin: 0;
+    padding: 0;
+    border-radius: 0 8px 8px 0;
+    background: var(--blue);
+}
+
+.scan-suffix-button:hover:not(:disabled) {
+    background: var(--blue-hover);
+}
+
+.scan-card > button {
+    white-space: nowrap;
+}
+
+.inline-message {
+    margin: 0;
+    color: #148253;
+    font-size: 12px;
+}
+
+.exam-attendance-tools {
+    display: grid;
+    gap: 16px;
+}
+
+.exam-attendance-tools h3 {
+    margin: 0;
+}
+
+.daily-schedule-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 10px;
+}
+
+.daily-schedule-option {
+    display: grid;
+    gap: 6px;
+    min-height: 84px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+
+.daily-schedule-option:hover {
+    border-color: var(--blue);
+}
+
+.daily-schedule-option:focus-visible {
+    outline: 3px solid #3267dc55;
+    outline-offset: 2px;
+}
+
+.daily-schedule-option-selected {
+    border-color: var(--blue);
+    background: #eef3ff;
+    box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+.daily-schedule-option strong {
+    font-size: 13px;
+}
+
+.daily-schedule-option span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.attendance-session-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.attendance-session-open {
+    margin: 0;
+    color: var(--success);
+    font-size: 12px;
+}
+
+.attendance-session-close {
+    background: var(--neutral-button);
+    color: var(--ink);
+}
+
+.attendance-session-close:hover:not(:disabled) {
+    background: var(--neutral-button-hover);
+}
+
+.schedule-time-warning {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid #f3cf86;
+    border-radius: 8px;
+    background: #fff8e6;
+    color: #825b12;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.exam-attendance-tools > label {
+    display: grid;
+    max-width: 520px;
+    gap: 7px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.exam-attendance-session {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.exam-attendance-session > div {
+    display: grid;
+    gap: 5px;
+}
+
+.exam-attendance-session .eyebrow {
+    margin: 0;
+}
+
+.exam-attendance-session strong {
+    font-size: 14px;
+}
+
+.exam-attendance-session span {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.exam-attendance-session > .schedule-time-warning {
+    flex: 1 1 100%;
+}
+
+.attendance-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 18px;
+}
+
+.search-input {
+    margin-bottom: 10px;
+}
+
+.scanner-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: #10182bcc;
+}
+
+.scanner-card {
+    width: min(520px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 22px 70px #111b3566;
+}
+
+.scanner-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.scanner-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.scanner-body {
+    display: grid;
+    gap: 12px;
+    padding: 20px;
+}
+
+.scanner-preview {
+    position: relative;
+    min-height: 280px;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #0e1728;
+}
+
+.scanner-preview video {
+    width: 100%;
+    height: 320px;
+    display: block;
+    object-fit: cover;
+}
+
+.scanner-frame {
+    position: absolute;
+    inset: 20% 16%;
+    display: grid;
+    place-items: center;
+    border: 2px solid #70d6a4;
+    border-radius: 14px;
+    color: #70d6a4;
+    pointer-events: none;
+}
+
+.scanner-busy {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: #10182bcc;
+    color: white;
+    font-size: 11px;
+}
+
+.loading-icon {
+    animation: spin .8s linear infinite;
+}
+
+.scanner-camera-select {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.scanner-camera-select span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.scanner-camera-select select {
+    min-height: 40px;
+}
+
+.scanner-error, .scanner-message {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+.scanner-error {
+    color: #b42318;
+    background: #ffebed;
+}
+
+.scanner-message {
+    color: #148253;
+    background: #e6f8f0;
+}
+
+.scanner-hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+@media (max-width: 640px) {
+    .scan-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .scan-input-group,
+    .scan-card > button {
+        grid-column: 1 / -1;
+    }
+
+    .scan-card > button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .exam-attendance-session {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .exam-attendance-session button {
+        width: 100%;
+    }
+}

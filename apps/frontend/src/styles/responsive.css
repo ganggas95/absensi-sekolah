@@ -1,0 +1,361 @@
+@media (max-width: 980px) {
+    .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-grid, .attendance-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 720px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform .2s ease;
+        box-shadow: 12px 0 30px #101c3d33;
+    }
+
+    .sidebar-open {
+        transform: translateX(0);
+    }
+
+    .sidebar-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        background: #10182b88;
+        border: 0;
+    }
+
+    .main-shell {
+        margin-left: 0;
+    }
+
+    .mobile-menu-button, .mobile-only {
+        display: grid;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .topbar {
+        height: 68px;
+        padding: 0 18px;
+    }
+
+    .content-area {
+        padding: 24px 16px 40px;
+    }
+
+    .summary-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary-number {
+        grid-column: span 2;
+    }
+
+    .scan-card {
+        flex-wrap: wrap;
+    }
+
+    .scan-copy {
+        flex: 1;
+    }
+
+    .scan-card input {
+        max-width: none;
+        flex: 1 1 200px;
+    }
+
+    .scan-card button {
+        margin-left: 0;
+    }
+
+    .stat-card {
+        padding: 14px;
+    }
+}
+
+@media (max-width: 720px) {
+    .resource-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resource-form-grid textarea, .resource-form-grid .toolbar {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .content-area {
+        padding: 18px 12px 32px;
+        overflow-x: hidden;
+    }
+
+    .page-intro h2 {
+        font-size: 20px;
+    }
+
+    .panel {
+        padding: 14px;
+        min-width: 0;
+    }
+
+    .resource-list .panel-heading {
+        display: grid;
+        gap: 12px;
+    }
+
+    .resource-list .panel-heading .toolbar {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .resource-list .panel-heading .management-search {
+        flex: 1 1 100%;
+    }
+
+    .resource-list .panel-heading .toolbar button {
+        flex: 1;
+    }
+
+    .management-pagination {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .management-pagination > label {
+        justify-content: space-between;
+    }
+
+    .management-pagination-controls {
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .management-pagination-controls button {
+        padding: 0 10px;
+    }
+
+    .resource-list .recent-table {
+        overflow: visible;
+    }
+
+    .resource-list table, .resource-list tbody {
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        gap: 10px;
+    }
+
+    .resource-list thead {
+        display: none;
+    }
+
+    .resource-list tr {
+        display: grid;
+        gap: 2px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fbfcfe;
+    }
+
+    .resource-list td {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 3px 0;
+        border: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .resource-list td::before {
+        content: attr(data-label);
+        flex: 0 0 36%;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+    .resource-list .action-cell {
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-top: 7px;
+        border-top: 1px solid var(--line);
+    }
+
+    .resource-list .action-cell::before {
+        display: none;
+    }
+
+    .resource-list .action-cell button {
+        flex: 0 0 auto;
+        min-height: 44px;
+        padding: 0 10px;
+        margin: 0;
+        font-size: 10px;
+    }
+
+    .modal-dialog {
+        width: calc(100% - 20px);
+        max-height: calc(100vh - 20px);
+    }
+
+    .modal-card {
+        max-height: calc(100vh - 20px);
+    }
+
+    .modal-header, .modal-body {
+        padding: 14px;
+    }
+
+    .modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .modal-actions button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-grid {
+        gap: 10px;
+    }
+
+    .stat-card {
+        gap: 8px;
+    }
+
+    .stat-icon {
+        width: 35px;
+        height: 35px;
+    }
+
+    .stat-copy strong {
+        font-size: 20px;
+    }
+
+    .stat-copy small {
+        font-size: 9px;
+    }
+
+    .topbar-title h1 {
+        font-size: 16px;
+    }
+
+    .topbar-actions .notification-button {
+        display: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .scan-input-group {
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .scan-card > button {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .scanner-overlay {
+        padding: 10px;
+    }
+
+    .scanner-card {
+        max-height: calc(100vh - 20px);
+    }
+
+    .scanner-header, .scanner-body {
+        padding: 14px;
+    }
+
+    .scanner-preview video {
+        height: min(58vh, 320px);
+    }
+
+    .toast {
+        top: 12px;
+        right: 12px;
+        width: calc(100vw - 24px);
+    }
+}
+
+@media (max-width: 760px) {
+    .login-page {
+        display: block;
+        min-height: 100vh;
+    }
+
+    .login-showcase {
+        min-height: auto;
+        padding: 24px 20px 28px;
+    }
+
+    .login-showcase-content {
+        margin: 42px 0 0;
+    }
+
+    .login-showcase-content h1 {
+        max-width: 430px;
+        font-size: 30px;
+    }
+
+    .login-showcase-content > p:not(.eyebrow), .login-features, .login-showcase-footer {
+        display: none;
+    }
+
+    .login-illustration {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 20px;
+        border-radius: 20px;
+    }
+
+    .login-illustration svg {
+        width: 48px;
+        height: 48px;
+    }
+
+    .login-illustration::before {
+        inset: 8px;
+        border-radius: 15px;
+    }
+
+    .login-form-area {
+        display: block;
+        padding: 32px 20px 40px;
+    }
+
+    .login-card {
+        max-width: 460px;
+        margin: 0 auto;
+    }
+
+    .login-mobile-mark {
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 20px;
+        border-radius: 11px;
+        color: white;
+        background: var(--blue);
+    }
+
+    .login-form-heading {
+        margin-bottom: 25px;
+    }
+
+    .login-form-heading h2 {
+        font-size: 25px;
+    }
+}

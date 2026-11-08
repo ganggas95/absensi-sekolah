@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: 'Josefin Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/josefin-sans-400.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Josefin Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/fonts/josefin-sans-500.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Josefin Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/josefin-sans-600.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Josefin Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/josefin-sans-700.ttf') format('truetype');
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+    color: #172033;
+    font-family: 'Josefin Sans', sans-serif;
+}
+
+main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+}
+
+button, input, select {
+    min-height: 44px;
+    font: inherit;
+}
+
+button:not(.icon-button), .button-with-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+button {
+    cursor: pointer;
+    border: 0;
+    border-radius: 8px;
+    padding: 0 14px;
+    background: var(--blue);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+button:hover:not(:disabled) {
+    background: var(--blue-hover);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+button:focus-visible {
+    outline: 3px solid #315efb55;
+    outline-offset: 2px;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+.toolbar > button, .modal-actions button:last-child, main .card button {
+    background: var(--blue);
+}
+
+.toolbar > button:hover:not(:disabled), .modal-actions button:last-child:hover:not(:disabled), main .card button:hover:not(:disabled) {
+    background: var(--blue-hover);
+}
+
+.action-cell button:first-child, .modal-actions button:first-child {
+    background: var(--neutral-button);
+    color: var(--ink);
+}
+
+.action-cell button:first-child:hover:not(:disabled), .modal-actions button:first-child:hover:not(:disabled) {
+    background: var(--neutral-button-hover);
+}
+
+.action-cell button:nth-child(2) {
+    background: var(--danger);
+}
+
+.action-cell button:nth-child(2):hover:not(:disabled) {
+    background: var(--danger-hover);
+}
+
+.scan-card button {
+    background: var(--success);
+}
+
+.scan-card button:hover:not(:disabled) {
+    background: var(--success-hover);
+}
+
+input, select {
+    width: 100%;
+    border: 1px solid #ccd3df;
+    border-radius: 8px;
+    padding: 0 12px;
+    background: white;
+}
+
+input[type="checkbox"] {
+    width: auto;
+    min-height: 18px;
+    accent-color: #315efb;
+}
+
+.card {
+    background: white;
+    border: 1px solid #e2e7ef;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px #1720330a;
+}
+
+.grid {
+    display: grid;
+    gap: 12px;
+}
+
+.toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.toolbar input {
+    max-width: 360px;
+}
+
+.muted {
+    color: #697386;
+}
+
+.error {
+    color: #b42318;
+}
+
+.success {
+    color: #067647;
+}
+
+.two-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 1px solid #edf0f5;
+}
+
+@media (max-width: 640px) {
+    .two-columns {
+        grid-template-columns: 1fr;
+    }
+
+    table, thead, tbody, tr, td {
+        display: block;
+    }
+
+    thead {
+        display: none;
+    }
+
+    tr {
+        border-bottom: 1px solid #edf0f5;
+        padding: 8px 0;
+    }
+
+    td {
+        border: 0;
+        padding: 5px 0;
+    }
+
+    td::before {
+        content: attr(data-label) ": ";
+        font-weight: 600;
+    }
+}
+
+:root {
+    --navy: #16213b;
+    --ink: #172033;
+    --muted: #7c879d;
+    --line: #e8ecf3;
+    --surface: #ffffff;
+    --canvas: #f7f9fc;
+    --blue: #315efb;
+    --blue-hover: #254bd4;
+    --danger: #d64545;
+    --danger-hover: #b93636;
+    --success: #16845a;
+    --success-hover: #106b48;
+    --neutral-button: #eef1f5;
+    --neutral-button-hover: #dfe4ec;
+}
+
+body {
+    background: var(--canvas);
+    color: var(--ink);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+

@@ -1,0 +1,112 @@
+.weekly-schedule-page {
+    display: grid;
+    gap: 12px;
+}
+
+.weekly-schedule-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.weekly-schedule-tools > span {
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.weekly-schedule-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+}
+
+.weekly-day-card {
+    min-width: 0;
+    padding: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+}
+
+.weekly-day-card h2 {
+    margin: 0 0 10px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.weekly-lesson-row,
+.weekly-break-row {
+    display: grid;
+    grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+    align-items: start;
+    gap: 3px 8px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line);
+}
+
+.weekly-lesson-row time,
+.weekly-break-row time {
+    grid-row: span 3;
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.weekly-lesson-row strong,
+.weekly-break-row strong {
+    min-width: 0;
+    color: var(--ink);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.weekly-lesson-row span,
+.weekly-lesson-row small {
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.weekly-break-row {
+    align-items: center;
+    border-top: 0;
+    border-radius: 8px;
+    background: #edf8f1;
+    padding: 10px 8px;
+}
+
+.weekly-break-row time,
+.weekly-break-row strong {
+    grid-row: auto;
+    color: #176b48;
+}
+
+.weekly-day-empty {
+    margin: 0;
+    padding: 10px 0 2px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+}
+
+@media (min-width: 640px) {
+    .weekly-schedule-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .weekly-schedule-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}

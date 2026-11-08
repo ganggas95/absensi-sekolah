@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: absensi_e2e
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e -d absensi_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build: ./apps/backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://e2e:e2e-only@db:5432/absensi_e2e
+      E2E_TEST_MODE: "1"
+      JWT_SECRET_KEY: e2e-only-secret-not-for-production
+      CORS_ORIGINS: http://127.0.0.1:3100
+      MEDIA_DIR: /tmp/absensi-e2e-media
+    ports:
+      - "127.0.0.1:18001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
