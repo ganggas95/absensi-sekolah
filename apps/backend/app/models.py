@@ -275,6 +275,30 @@ class DailyAttendance(Base):
     )
 
 
+class TeacherAttendance(Base):
+    __tablename__ = "teacher_attendances"
+    __table_args__ = (
+        UniqueConstraint("teacher_id", "date", name="uq_teacher_attendance_date"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("teachers.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    check_in_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    check_out_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[AttendanceStatus] = mapped_column(
+        Enum(AttendanceStatus, name="attendance_status")
+    )
+    check_in_ip: Mapped[str | None] = mapped_column(String(45))
+    check_out_ip: Mapped[str | None] = mapped_column(String(45))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    teacher: Mapped[Teacher] = relationship()
+
+
 class EventAttendance(Base):
     __tablename__ = "event_attendances"
     __table_args__ = (

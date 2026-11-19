@@ -7,6 +7,7 @@ from app.api.reports import router as reports_router
 from app.api.school import router as school_router
 from app.api.schedules import router as schedules_router
 from app.api.students import router as students_router
+from app.api.teacher_attendance import router as teacher_attendance_router
 from app.api.users_teachers import router as users_teachers_router
 
 router = APIRouter()
@@ -18,6 +19,7 @@ for feature_router in (
     schedules_router,
     students_router,
     attendance_router,
+    teacher_attendance_router,
     cards_router,
     reports_router,
 ):

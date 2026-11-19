@@ -17,5 +17,6 @@ app.include_router(api_router)
 
 
 @app.get("/health")
+@app.get("/api/v1/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "app": "absensi-sekolah"}

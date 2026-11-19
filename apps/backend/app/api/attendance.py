@@ -15,19 +15,25 @@ from app.models import (
     DailyAttendance,
     EventAttendance,
     Role,
+    Rombel,
     ScheduleEvent,
     ScheduleEventType,
     Student,
+    Subject,
     Teacher,
     User,
 )
 from app.schemas import (
+    ActiveScheduleSummary,
     AttendanceConfigOut,
     DailyOut,
     DailyRecord,
     EventAttendanceOut,
     EventAttendanceRecord,
+    ScheduleAttendanceStat,
     ScheduleEventOut,
+    StudentAttendanceStat,
+    TeacherDashboardStatsOut,
 )
 
 router = APIRouter(prefix="/api/v1/attendance")
@@ -346,3 +352,259 @@ def list_daily(
         }
         for record, student_name in query.order_by(DailyAttendance.date.desc()).all()
     ]
+
+
+@router.get("/teacher/dashboard-stats", response_model=TeacherDashboardStatsOut)
+def get_teacher_dashboard_stats(
+    current: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    teacher = None
+    if current.role == Role.GURU:
+        teacher = (
+            db.query(Teacher)
+            .filter(Teacher.user_id == current.id, Teacher.is_active.is_(True))
+            .first()
+        )
+        if not teacher:
+            raise HTTPException(
+                status_code=404, detail="Profil guru aktif tidak ditemukan"
+            )
+    else:
+        # Admin testing fallback: pick first active teacher
+        teacher = db.query(Teacher).filter(Teacher.is_active.is_(True)).first()
+        if not teacher:
+            raise HTTPException(
+                status_code=404, detail="Belum ada guru yang terdaftar"
+            )
+
+    teacher_name = teacher.user.full_name if teacher.user else current.full_name
+    now_local = datetime.now(ATTENDANCE_TIMEZONE)
+    today = now_local.date()
+    now_time = now_local.time()
+
+    # Active academic year
+    active_year = (
+        db.query(AcademicYear).filter(AcademicYear.is_active.is_(True)).first()
+    )
+    year_id = active_year.id if active_year else None
+
+    # Teacher's schedules today (KBM)
+    today_schedules_query = (
+        db.query(ScheduleEvent)
+        .filter(
+            ScheduleEvent.teacher_id == teacher.id,
+            ScheduleEvent.event_type == ScheduleEventType.KBM,
+            ScheduleEvent.day_of_week == today.weekday(),
+        )
+    )
+    if year_id:
+        today_schedules_query = today_schedules_query.filter(
+            ScheduleEvent.academic_year_id == year_id
+        )
+    today_schedules = today_schedules_query.order_by(ScheduleEvent.start_time).all()
+
+    # Determine currently active or upcoming schedule
+    active_sched_event = None
+    is_active_now = False
+
+    for s in today_schedules:
+        if s.start_time <= now_time <= s.end_time:
+            active_sched_event = s
+            is_active_now = True
+            break
+
+    if not active_sched_event:
+        for s in today_schedules:
+            if s.start_time > now_time:
+                active_sched_event = s
+                break
+
+    if not active_sched_event and today_schedules:
+        active_sched_event = today_schedules[0]
+
+    active_summary = None
+    if active_sched_event:
+        rombel = db.get(Rombel, active_sched_event.rombel_id)
+        subject = db.get(Subject, active_sched_event.subject_id)
+        students_in_rombel = (
+            db.query(Student)
+            .filter(
+                Student.rombel_id.in_(active_sched_event.rombel_ids),
+                Student.is_active.is_(True),
+            )
+            .all()
+        )
+        total_students = len(students_in_rombel)
+        student_ids = [st.id for st in students_in_rombel]
+
+        records_today = (
+            db.query(DailyAttendance)
+            .filter(
+                DailyAttendance.student_id.in_(student_ids),
+                DailyAttendance.date == today,
+            )
+            .all()
+            if student_ids
+            else []
+        )
+        hadir_cnt = sum(
+            1 for r in records_today if r.status == AttendanceStatus.HADIR
+        )
+        terlambat_cnt = sum(
+            1 for r in records_today if r.status == AttendanceStatus.TERLAMBAT
+        )
+        recorded_cnt = len(records_today)
+        unrecorded_cnt = max(0, total_students - recorded_cnt)
+
+        active_summary = ActiveScheduleSummary(
+            schedule_id=active_sched_event.id,
+            title=active_sched_event.title,
+            rombel_name=rombel.name if rombel else "-",
+            subject_name=subject.name if subject else "-",
+            start_time=active_sched_event.start_time,
+            end_time=active_sched_event.end_time,
+            is_currently_active=is_active_now,
+            total_students=total_students,
+            recorded_count=recorded_cnt,
+            hadir_count=hadir_cnt,
+            terlambat_count=terlambat_cnt,
+            unrecorded_count=unrecorded_cnt,
+        )
+
+    # All schedules of this teacher (for attendance rates per schedule/class)
+    all_teacher_schedules = (
+        db.query(ScheduleEvent)
+        .filter(
+            ScheduleEvent.teacher_id == teacher.id,
+            ScheduleEvent.event_type == ScheduleEventType.KBM,
+        )
+        .all()
+    )
+
+    all_rombel_ids = set()
+    for s in all_teacher_schedules:
+        all_rombel_ids.update(s.rombel_ids)
+
+    # Schedule attendance rates
+    schedule_rates: list[ScheduleAttendanceStat] = []
+    for s in all_teacher_schedules:
+        rombel = db.get(Rombel, s.rombel_id)
+        subject = db.get(Subject, s.subject_id)
+        students_in_s = (
+            db.query(Student)
+            .filter(Student.rombel_id.in_(s.rombel_ids), Student.is_active.is_(True))
+            .all()
+        )
+        s_student_ids = [st.id for st in students_in_s]
+        s_total_students = len(students_in_s)
+
+        if s_student_ids:
+            total_attendance_records = (
+                db.query(DailyAttendance)
+                .filter(DailyAttendance.student_id.in_(s_student_ids))
+                .all()
+            )
+            total_recs = len(total_attendance_records)
+            present_recs = sum(
+                1
+                for r in total_attendance_records
+                if r.status in (AttendanceStatus.HADIR, AttendanceStatus.TERLAMBAT)
+            )
+            rate = round((present_recs / total_recs * 100.0), 1) if total_recs > 0 else 0.0
+        else:
+            present_recs = 0
+            rate = 0.0
+
+        schedule_rates.append(
+            ScheduleAttendanceStat(
+                schedule_id=s.id,
+                title=s.title,
+                rombel_name=rombel.name if rombel else "-",
+                subject_name=subject.name if subject else "-",
+                day_of_week=s.day_of_week,
+                start_time=s.start_time,
+                end_time=s.end_time,
+                total_students=s_total_students,
+                present_count=present_recs,
+                attendance_rate=rate,
+            )
+        )
+
+    # Sort schedule attendance rates descending
+    schedule_rates.sort(key=lambda x: x.attendance_rate, reverse=True)
+
+    # Calculate student attendance statistics for students in this teacher's classes
+    teacher_students = (
+        db.query(Student)
+        .filter(Student.rombel_id.in_(all_rombel_ids), Student.is_active.is_(True))
+        .all()
+        if all_rombel_ids
+        else []
+    )
+
+    student_stats_list: list[StudentAttendanceStat] = []
+    for st in teacher_students:
+        rombel = db.get(Rombel, st.rombel_id)
+        records = (
+            db.query(DailyAttendance)
+            .filter(DailyAttendance.student_id == st.id)
+            .all()
+        )
+        hadir_c = sum(1 for r in records if r.status == AttendanceStatus.HADIR)
+        terlambat_c = sum(
+            1 for r in records if r.status == AttendanceStatus.TERLAMBAT
+        )
+        izin_c = sum(1 for r in records if r.status == AttendanceStatus.IZIN)
+        sakit_c = sum(1 for r in records if r.status == AttendanceStatus.SAKIT)
+        alpa_c = sum(1 for r in records if r.status == AttendanceStatus.ALPA)
+        total_rec = len(records)
+        unexcused = alpa_c + sakit_c + izin_c
+        att_rate = (
+            round(((hadir_c + terlambat_c) / total_rec * 100.0), 1)
+            if total_rec > 0
+            else 0.0
+        )
+
+        student_stats_list.append(
+            StudentAttendanceStat(
+                student_id=st.id,
+                full_name=st.full_name,
+                nisn=st.nisn,
+                rombel_name=rombel.name if rombel else "-",
+                hadir_count=hadir_c,
+                terlambat_count=terlambat_c,
+                izin_count=izin_c,
+                sakit_count=sakit_c,
+                alpa_count=alpa_c,
+                total_unexcused=unexcused,
+                total_recorded=total_rec,
+                attendance_rate=att_rate,
+            )
+        )
+
+    # Top absent students: sort by alpa desc, unexcused desc, hadir asc
+    # Filter to students who have at least 1 absence (unexcused > 0)
+    top_absent = sorted(
+        [s for s in student_stats_list if s.total_unexcused > 0],
+        key=lambda x: (x.alpa_count, x.total_unexcused, -x.hadir_count),
+        reverse=True,
+    )[:5]
+
+    # Top diligent students: sort by attendance_rate desc, hadir_count desc, alpa asc
+    # Filter to students who have records
+    top_diligent = sorted(
+        [s for s in student_stats_list if s.total_recorded > 0],
+        key=lambda x: (x.attendance_rate, x.hadir_count, -x.alpa_count),
+        reverse=True,
+    )[:5]
+
+    return TeacherDashboardStatsOut(
+        teacher_name=teacher_name,
+        today_date=today,
+        active_schedule=active_summary,
+        today_schedules_count=len(today_schedules),
+        top_absent_students=top_absent,
+        top_diligent_students=top_diligent,
+        schedule_attendance_rates=schedule_rates,
+    )

@@ -21,6 +21,7 @@ from app.models import (
     Student,
     Subject,
     Teacher,
+    TeacherAttendance,
     TeacherSubject,
     User,
 )
@@ -142,6 +143,14 @@ def main() -> None:
                     check_in_time=now.astimezone(ZoneInfo("UTC")),
                     status=AttendanceStatus.HADIR,
                     notes="Fixture laporan harian",
+                ),
+                TeacherAttendance(
+                    teacher_id=teacher.id,
+                    date=today,
+                    check_in_time=now.astimezone(ZoneInfo("UTC")),
+                    check_in_ip="10.0.0.7",
+                    status=AttendanceStatus.TERLAMBAT,
+                    notes="Fixture absensi guru",
                 ),
                 EventAttendance(
                     schedule_event_id=kbm.id,

@@ -12,10 +12,28 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     cookie_secure: bool = False
     media_dir: Path = Path(__file__).resolve().parents[2] / "uploads"
+    # Absensi guru hanya diterima dari jaringan sekolah (daftar CIDR dipisah koma).
+    school_network_cidrs: str = ""
+    # IP host server di LAN (bukan IP container). Jaringan sekolah diturunkan dari
+    # IP ini dengan panjang prefix di bawah, bila school_network_cidrs kosong.
+    school_host_ip: str = ""
+    school_host_prefix: int = 24
+    require_school_network: bool = True
+    # Proxy (nginx) yang headernya boleh dipercaya untuk membaca IP klien asli.
+    trusted_proxy_cidrs: str = "127.0.0.0/8,::1/128,172.16.0.0/12"
+    teacher_late_tolerance_minutes: int = 10
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=False, extra="ignore"
     )
+
+    @property
+    def school_network_list(self) -> list[str]:
+        return [c.strip() for c in self.school_network_cidrs.split(",") if c.strip()]
+
+    @property
+    def trusted_proxy_list(self) -> list[str]:
+        return [c.strip() for c in self.trusted_proxy_cidrs.split(",") if c.strip()]
 
     @property
     def cors_origin_list(self) -> list[str]:

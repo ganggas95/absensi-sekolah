@@ -32,6 +32,50 @@ class UserOut(BaseModel):
     is_active: bool
 
 
+class MyProfileOut(BaseModel):
+    """Profil akun yang sedang login, termasuk data guru bila ada."""
+
+    id: uuid.UUID
+    username: str
+    full_name: str
+    role: Role
+    is_active: bool
+    teacher_id: uuid.UUID | None = None
+    nip: str | None = None
+    phone: str | None = None
+    subjects: list[str] = []
+
+
+class MyProfileUpdate(BaseModel):
+    """Data profil yang boleh diubah sendiri oleh pengguna."""
+
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    full_name: str | None = Field(default=None, min_length=2, max_length=100)
+    nip: str | None = Field(default=None, max_length=30)
+    phone: str | None = Field(default=None, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_full_name(self) -> Self:
+        if "full_name" in self.model_fields_set and self.full_name is None:
+            raise ValueError("Nama lengkap wajib diisi")
+        return self
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=6)
+
+    @model_validator(mode="after")
+    def validate_new_password(self) -> Self:
+        # bcrypt hanya memakai 72 byte pertama; tolak agar tidak terpotong diam-diam.
+        if len(self.new_password.encode("utf-8")) > 72:
+            raise ValueError("Password baru maksimal 72 karakter")
+        if self.new_password == self.current_password:
+            raise ValueError("Password baru harus berbeda dari password saat ini")
+        return self
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str = Field(min_length=6)
@@ -383,3 +427,95 @@ class DailyOut(BaseModel):
     status: AttendanceStatus
     notes: str | None
     already_recorded: bool = False
+
+
+class StudentAttendanceStat(BaseModel):
+    student_id: uuid.UUID
+    full_name: str
+    nisn: str | None = None
+    rombel_name: str
+    hadir_count: int = 0
+    terlambat_count: int = 0
+    izin_count: int = 0
+    sakit_count: int = 0
+    alpa_count: int = 0
+    total_unexcused: int = 0
+    total_recorded: int = 0
+    attendance_rate: float = 0.0
+
+
+class ScheduleAttendanceStat(BaseModel):
+    schedule_id: uuid.UUID
+    title: str
+    rombel_name: str
+    subject_name: str
+    day_of_week: int | None = None
+    start_time: time
+    end_time: time
+    total_students: int = 0
+    present_count: int = 0
+    attendance_rate: float = 0.0
+
+
+class ActiveScheduleSummary(BaseModel):
+    schedule_id: uuid.UUID
+    title: str
+    rombel_name: str
+    subject_name: str
+    start_time: time
+    end_time: time
+    is_currently_active: bool = False
+    total_students: int = 0
+    recorded_count: int = 0
+    hadir_count: int = 0
+    terlambat_count: int = 0
+    unrecorded_count: int = 0
+
+
+class TeacherDashboardStatsOut(BaseModel):
+    teacher_name: str
+    today_date: date_type
+    active_schedule: ActiveScheduleSummary | None = None
+    today_schedules_count: int = 0
+    top_absent_students: list[StudentAttendanceStat] = Field(default_factory=list)
+    top_diligent_students: list[StudentAttendanceStat] = Field(default_factory=list)
+    schedule_attendance_rates: list[ScheduleAttendanceStat] = Field(default_factory=list)
+
+
+class TeacherScheduleBrief(BaseModel):
+    schedule_id: uuid.UUID
+    title: str
+    rombel_name: str
+    subject_name: str
+    start_time: time
+    end_time: time
+
+
+class TeacherAttendanceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    teacher_id: uuid.UUID
+    teacher_name: str | None = None
+    nip: str | None = None
+    date: date_type
+    check_in_time: datetime | None
+    check_out_time: datetime | None
+    status: AttendanceStatus
+    notes: str | None = None
+    already_recorded: bool = False
+
+
+class TeacherTodayOut(BaseModel):
+    date: date_type
+    server_time: datetime
+    has_schedule: bool
+    schedules: list[TeacherScheduleBrief]
+    first_start: time | None = None
+    last_end: time | None = None
+    late_after: time | None = None
+    attendance: TeacherAttendanceOut | None = None
+    on_school_network: bool
+    client_ip: str | None = None
+    can_check_in: bool
+    can_check_out: bool
+    message: str | None = None

@@ -95,6 +95,14 @@ PUT /events/{id}: Edit a schedule event.
 
 DELETE /events/{id}: Delete a schedule event.
 
+Self-service account endpoints (`/api/v1/auth`, any logged-in user):
+
+GET /me/profile: Own account plus teacher data (`teacher_id`, `nip`, `phone`, `subjects` names). Teacher fields are empty when the account has no teacher profile. Read-only; guru cannot use the admin-only `/management/teachers`.
+
+PATCH /me/profile: Update own `full_name` and, when a teacher profile exists, `nip` and `phone`. Omitted fields are unchanged; `nip` and `phone` can be cleared with empty strings or `null`. Username, role, active status, and subject assignments are not editable through this endpoint. Duplicate NIP returns 409.
+
+POST /me/password: Change own password with `current_password` and `new_password` (6 to 72 characters, different from the current one). Returns 204. A wrong current password returns 400 `Password saat ini salah` and changes nothing. The password hash is never returned. Existing tokens stay valid until they expire.
+
 Attendance Router (/api/v1/attendance)
 
 GET /config: Get active daily attendance time configuration.
@@ -108,6 +116,18 @@ POST /event/record: Marking attendance for KBM or Exam sessions.
 GET /daily: Get daily attendance logs.
 
 GET /event/{schedule_event_id}: Get attendance list for a specific class/exam session.
+
+Teacher Attendance (`/api/v1/attendance/teacher`): guru check in before entering class and check out after teaching, from the mobile app. Only days on which the guru has an active-year KBM schedule are eligible. Time always comes from the server (Asia/Makassar); the client sends no time.
+
+GET /teacher/today: (GURU) Today's KBM schedules, first start / last end, late cut-off, current record, whether the request comes from the school network, and `can_check_in` / `can_check_out` flags with a user-facing `message`.
+
+POST /teacher/check-in: (GURU) Requires a KBM schedule today and a request from the school network (403 otherwise). Allowed until the last class ends. Status is `HADIR` up to `TEACHER_LATE_TOLERANCE_MINUTES` (default 10) after the first class starts, else `TERLAMBAT`. Repeating returns the existing record with `already_recorded: true`.
+
+POST /teacher/check-out: (GURU) Requires an earlier check-in and the school network. Allowed once the last class of the day has ended (422 before that). Repeating returns the existing record with `already_recorded: true`.
+
+GET /teacher/records: (Admin only) Teacher attendance records, filterable by `start_date`, `end_date`, `teacher_id`, `status`.
+
+School network check: the backend reads the client IP from `X-Real-IP` only when the direct peer is inside `TRUSTED_PROXY_CIDRS` (the nginx container); otherwise the peer address is used. The school network is the host server's LAN, never a container address. It comes from, in order: `SCHOOL_NETWORK_CIDRS` (comma-separated, explicit); `SCHOOL_HOST_IP` plus `SCHOOL_HOST_PREFIX` (default 24), the LAN IP of the host machine; or, when both are empty, the private IP in the request `Host` header (the address the phone used to reach the server). A hostname or public IP in `Host` yields no network and rejects everyone. Set `SCHOOL_HOST_IP` explicitly because a container cannot discover its host's LAN IP. `REQUIRE_SCHOOL_NETWORK=false` disables the check for local development and E2E only. The backend port must not be published directly in production, otherwise a client could spoof the header. On Docker Desktop (Mac/Windows) the real device address never reaches nginx, because the VM replaces the source address with its gateway IP. The mobile app therefore sends its WiFi IP in `X-Device-Ip`. The backend trusts that header only when the address it sees itself is not a public IP, so a request from the internet can never use it. A reported IP outside `SCHOOL_NETWORK_CIDRS` is still rejected. On a Linux host the real address from nginx is used directly and the header is not needed.
 
 For exam attendance, `GET /event/{schedule_event_id}` lists active students in the scheduled rombel, including those not yet recorded. `POST /event/record` accepts `schedule_event_id`, `student_id` (student UUID from QR), optional `status` (defaults to `HADIR`), and optional `notes`. A repeated scan returns the existing record without overwriting it; students outside the exam rombel are rejected.
 

@@ -16,6 +16,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://e2e:e2e-only@db:5432/absensi_e2e
       E2E_TEST_MODE: "1"
+      REQUIRE_SCHOOL_NETWORK: "false"
       JWT_SECRET_KEY: e2e-only-secret-not-for-production
       CORS_ORIGINS: http://127.0.0.1:3100
       MEDIA_DIR: /tmp/absensi-e2e-media

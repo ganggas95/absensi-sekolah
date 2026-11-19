@@ -25,6 +25,10 @@ services:
       CORS_ORIGINS: https://${INTRANET_HOST:-intranet.bca.local}
       COOKIE_SECURE: "true"
       MEDIA_DIR: /app/uploads
+      SCHOOL_NETWORK_CIDRS: ${SCHOOL_NETWORK_CIDRS:-}
+      SCHOOL_HOST_IP: ${SCHOOL_HOST_IP:-}
+      SCHOOL_HOST_PREFIX: ${SCHOOL_HOST_PREFIX:-24}
+      REQUIRE_SCHOOL_NETWORK: ${REQUIRE_SCHOOL_NETWORK:-true}
     networks:
       - default
       - database
@@ -51,8 +55,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./cert/server.crt:/etc/nginx/certs/server.crt:ro
-      - ./cert/server.key:/etc/nginx/certs/server.key:ro
+#      - ./cert/server.crt:/etc/nginx/certs/server.crt:ro
+#      - ./cert/server.key:/etc/nginx/certs/server.key:ro
     depends_on:
       - backend
       - frontend

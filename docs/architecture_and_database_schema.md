@@ -16,6 +16,8 @@ User Management (Manajemen User): Roles (Admin, Guru).
 
 Teacher Management (Manajemen Guru): Teacher profiles are linked one-to-one to active GURU users and can be assigned multiple subjects.
 
+Teacher Attendance (Absensi Guru): Guru absen datang sebelum mengajar dan absen pulang setelah jam mengajar terakhir lewat aplikasi mobile, hanya pada hari guru punya jadwal KBM dan hanya dari jaringan WiFi sekolah. Admin memantau lewat halaman Absensi Guru.
+
 Subject Management (Manajemen Mata Pelajaran): Maintain subject codes and names, then assign them to teachers.
 
 Classroom & Cohort Management (Manajemen Rombel): Grouping students by class and entry year/academic year.
@@ -187,6 +189,21 @@ CREATE TABLE daily_attendances (
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(student_id, date)
+);
+
+-- Teacher Attendance (datang / pulang guru, hanya pada hari ada jadwal KBM)
+CREATE TABLE teacher_attendances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    teacher_id UUID REFERENCES teachers(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    check_in_time TIMESTAMP WITH TIME ZONE,
+    check_out_time TIMESTAMP WITH TIME ZONE,
+    status VARCHAR(20) CHECK (status IN ('HADIR', 'TERLAMBAT', 'IZIN', 'SAKIT', 'ALPA')) NOT NULL,
+    check_in_ip VARCHAR(45),
+    check_out_ip VARCHAR(45),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(teacher_id, date)
 );
 
 -- Event Attendance (KBM & Exam)
