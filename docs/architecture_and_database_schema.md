@@ -36,7 +36,7 @@ Attendance Records (Record Absensi):
 
 Daily Check-in / Check-out (Absensi Masuk/Pulang)
 
-Subject Attendance (Absensi Kelas per Matpel)
+Subject Attendance (Absensi Kelas per Matpel): setiap sesi absensi KBM disimpan per jadwal dan tanggal sehingga dua guru yang mengajar rombel sama pada hari yang sama tidak berbagi data.
 
 Exam Attendance (Absensi Ujian)
 
@@ -178,17 +178,30 @@ CREATE TABLE attendance_configs (
     is_active BOOLEAN DEFAULT TRUE
 );
 
--- Daily Attendance (Masuk / Pulang)
+-- Attendance Session (sesi absensi KBM yang dibuka guru; satu per jadwal per tanggal)
+CREATE TABLE attendance_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    schedule_event_id UUID NOT NULL REFERENCES schedule_events(id) ON DELETE CASCADE,
+    session_date DATE NOT NULL,
+    opened_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    opened_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    closed_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(schedule_event_id, session_date)
+);
+
+-- Daily Attendance (kehadiran siswa pada satu sesi jadwal KBM)
 CREATE TABLE daily_attendances (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    schedule_event_id UUID REFERENCES schedule_events(id) ON DELETE CASCADE, -- NULL hanya untuk data lama
     date DATE NOT NULL,
     check_in_time TIMESTAMP WITH TIME ZONE,
     check_out_time TIMESTAMP WITH TIME ZONE,
     status VARCHAR(20) CHECK (status IN ('HADIR', 'TERLAMBAT', 'IZIN', 'SAKIT', 'ALPA')) NOT NULL,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(student_id, date)
+    UNIQUE(student_id, schedule_event_id, date)
 );
 
 -- Teacher Attendance (datang / pulang guru, hanya pada hari ada jadwal KBM)
@@ -206,7 +219,7 @@ CREATE TABLE teacher_attendances (
     UNIQUE(teacher_id, date)
 );
 
--- Event Attendance (KBM & Exam)
+-- Event Attendance (Ujian)
 CREATE TABLE event_attendances (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     schedule_event_id UUID REFERENCES schedule_events(id) ON DELETE CASCADE,

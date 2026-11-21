@@ -10,6 +10,7 @@ from app.db import get_db
 from app.deps import current_user
 from app.models import (
     AttendanceConfig,
+    AttendanceSession,
     AttendanceStatus,
     AcademicYear,
     DailyAttendance,
@@ -26,6 +27,8 @@ from app.models import (
 from app.schemas import (
     ActiveScheduleSummary,
     AttendanceConfigOut,
+    AttendanceSessionOpen,
+    AttendanceSessionOut,
     DailyOut,
     DailyRecord,
     EventAttendanceOut,
@@ -83,6 +86,169 @@ def list_daily_schedules(
     return query.order_by(ScheduleEvent.start_time).all()
 
 
+def _local_today() -> date:
+    return datetime.now(ATTENDANCE_TIMEZONE).date()
+
+
+def _get_kbm_schedule(db: Session, schedule_event_id: UUID, day: date) -> ScheduleEvent:
+    schedule = db.get(ScheduleEvent, schedule_event_id)
+    if (
+        not schedule
+        or schedule.event_type != ScheduleEventType.KBM
+        or schedule.day_of_week != day.weekday()
+        or not db.query(AcademicYear)
+        .filter(
+            AcademicYear.id == schedule.academic_year_id,
+            AcademicYear.is_active.is_(True),
+        )
+        .first()
+    ):
+        raise HTTPException(status_code=422, detail="Jadwal tidak aktif untuk hari ini")
+    return schedule
+
+
+def _require_schedule_teacher(
+    schedule: ScheduleEvent | None, user: User, db: Session
+) -> None:
+    if user.role != Role.GURU:
+        return
+    if schedule is None:
+        raise HTTPException(status_code=404, detail="Jadwal tidak ditemukan")
+    teacher = (
+        db.query(Teacher)
+        .filter(
+            Teacher.user_id == user.id,
+            Teacher.id == schedule.teacher_id,
+            Teacher.is_active.is_(True),
+        )
+        .first()
+    )
+    if not teacher:
+        raise HTTPException(
+            status_code=403, detail="Jadwal ini bukan jadwal mengajar Anda"
+        )
+
+
+def _session_out(db: Session, session: AttendanceSession) -> AttendanceSessionOut:
+    opener = db.get(User, session.opened_by) if session.opened_by else None
+    return AttendanceSessionOut(
+        id=session.id,
+        schedule_event_id=session.schedule_event_id,
+        session_date=session.session_date,
+        opened_by=session.opened_by,
+        opened_by_name=opener.full_name if opener else None,
+        opened_at=session.opened_at,
+        closed_by=session.closed_by,
+        closed_at=session.closed_at,
+        is_open=session.closed_at is None,
+    )
+
+
+@router.post("/daily/sessions/open", response_model=AttendanceSessionOut)
+def open_daily_session(
+    payload: AttendanceSessionOpen,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Open (or reopen) the attendance session of a KBM schedule for today.
+
+    The session is persisted and unique per schedule and date, so a page
+    reload, another teacher, or the next schedule on the same day can never
+    continue the previous teacher's attendance scope.
+    """
+
+    today = _local_today()
+    schedule = _get_kbm_schedule(db, payload.schedule_event_id, today)
+    _require_schedule_teacher(schedule, user, db)
+    session = (
+        db.query(AttendanceSession)
+        .filter(
+            AttendanceSession.schedule_event_id == schedule.id,
+            AttendanceSession.session_date == today,
+        )
+        .first()
+    )
+    if session:
+        if session.closed_at is not None:
+            session.closed_at = None
+            session.closed_by = None
+            db.commit()
+            db.refresh(session)
+    else:
+        session = AttendanceSession(
+            schedule_event_id=schedule.id,
+            session_date=today,
+            opened_by=user.id,
+        )
+        db.add(session)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            session = (
+                db.query(AttendanceSession)
+                .filter(
+                    AttendanceSession.schedule_event_id == schedule.id,
+                    AttendanceSession.session_date == today,
+                )
+                .first()
+            )
+            if not session:
+                raise
+        else:
+            db.refresh(session)
+    return _session_out(db, session)
+
+
+@router.get("/daily/sessions", response_model=list[AttendanceSessionOut])
+def list_daily_sessions(
+    attendance_date: date | None = None,
+    schedule_event_id: UUID | None = None,
+    current: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    query = db.query(AttendanceSession).filter(
+        AttendanceSession.session_date == (attendance_date or _local_today())
+    )
+    if schedule_event_id:
+        query = query.filter(AttendanceSession.schedule_event_id == schedule_event_id)
+    if current.role == Role.GURU:
+        teacher = (
+            db.query(Teacher)
+            .filter(Teacher.user_id == current.id, Teacher.is_active.is_(True))
+            .first()
+        )
+        if not teacher:
+            return []
+        teacher_schedules = db.query(ScheduleEvent.id).filter(
+            ScheduleEvent.teacher_id == teacher.id
+        )
+        query = query.filter(AttendanceSession.schedule_event_id.in_(teacher_schedules))
+    return [
+        _session_out(db, session)
+        for session in query.order_by(AttendanceSession.opened_at).all()
+    ]
+
+
+@router.post("/daily/sessions/{session_id}/close", response_model=AttendanceSessionOut)
+def close_daily_session(
+    session_id: UUID,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    session = db.get(AttendanceSession, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesi absensi tidak ditemukan")
+    schedule = db.get(ScheduleEvent, session.schedule_event_id)
+    _require_schedule_teacher(schedule, user, db)
+    if session.closed_at is None:
+        session.closed_at = datetime.now(timezone.utc)
+        session.closed_by = user.id
+        db.commit()
+        db.refresh(session)
+    return _session_out(db, session)
+
+
 @router.post("/daily/record", response_model=DailyOut)
 def record_daily(
     payload: DailyRecord,
@@ -93,34 +259,17 @@ def record_daily(
         raise HTTPException(
             status_code=422, detail="id_siswa, student_id, atau nisn wajib diisi"
         )
-    schedule = db.get(ScheduleEvent, payload.schedule_event_id)
-    today = datetime.now(ATTENDANCE_TIMEZONE).date()
-    if (
-        not schedule
-        or schedule.event_type != ScheduleEventType.KBM
-        or schedule.day_of_week != today.weekday()
-        or not db.query(AcademicYear)
-        .filter(
-            AcademicYear.id == schedule.academic_year_id,
-            AcademicYear.is_active.is_(True),
+    session = db.get(AttendanceSession, payload.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesi absensi tidak ditemukan")
+    if session.session_date != _local_today():
+        raise HTTPException(
+            status_code=422, detail="Sesi absensi sudah tidak berlaku"
         )
-        .first()
-    ):
-        raise HTTPException(status_code=422, detail="Jadwal tidak aktif untuk hari ini")
-    if user.role == Role.GURU:
-        teacher = (
-            db.query(Teacher)
-            .filter(
-                Teacher.user_id == user.id,
-                Teacher.id == schedule.teacher_id,
-                Teacher.is_active.is_(True),
-            )
-            .first()
-        )
-        if not teacher:
-            raise HTTPException(
-                status_code=403, detail="Jadwal ini bukan jadwal mengajar Anda"
-            )
+    if session.closed_at is not None:
+        raise HTTPException(status_code=422, detail="Sesi absensi sudah ditutup")
+    schedule = _get_kbm_schedule(db, session.schedule_event_id, session.session_date)
+    _require_schedule_teacher(schedule, user, db)
     student_identifier = payload.id_siswa or payload.student_id
     student = (
         db.get(Student, student_identifier)
@@ -137,15 +286,13 @@ def record_daily(
         )
     now = datetime.now(timezone.utc)
     local_now = now.astimezone(ATTENDANCE_TIMEZONE)
-    attendance_date = payload.date or local_now.date()
-    record = (
-        db.query(DailyAttendance)
-        .filter(
-            DailyAttendance.student_id == student.id,
-            DailyAttendance.date == attendance_date,
-        )
-        .first()
+    attendance_date = session.session_date
+    record_filter = (
+        DailyAttendance.student_id == student.id,
+        DailyAttendance.schedule_event_id == schedule.id,
+        DailyAttendance.date == attendance_date,
     )
+    record = db.query(DailyAttendance).filter(*record_filter).first()
     if payload.check_in:
         if record and record.check_in_time:
             return {
@@ -153,7 +300,7 @@ def record_daily(
                 "already_recorded": True,
             }
         late_threshold = datetime.combine(
-            local_now.date(), schedule.start_time
+            attendance_date, schedule.start_time
         ) + timedelta(minutes=10)
         status_value = (
             AttendanceStatus.TERLAMBAT
@@ -165,6 +312,7 @@ def record_daily(
     if not record:
         record = DailyAttendance(
             student_id=student.id,
+            schedule_event_id=schedule.id,
             date=attendance_date,
             status=status_value,
             notes=payload.notes,
@@ -182,14 +330,7 @@ def record_daily(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = (
-            db.query(DailyAttendance)
-            .filter(
-                DailyAttendance.student_id == student.id,
-                DailyAttendance.date == attendance_date,
-            )
-            .first()
-        )
+        existing = db.query(DailyAttendance).filter(*record_filter).first()
         if existing:
             return {
                 **DailyOut.model_validate(existing).model_dump(),
@@ -335,14 +476,45 @@ def _require_exam_supervisor(event: ScheduleEvent, user: User, db: Session) -> N
 def list_daily(
     attendance_date: date | None = None,
     student_id: UUID | None = None,
-    _: User = Depends(current_user),
+    session_id: UUID | None = None,
+    schedule_event_id: UUID | None = None,
+    current: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
     query = db.query(DailyAttendance, Student.full_name).join(
         Student, Student.id == DailyAttendance.student_id
     )
-    if attendance_date:
-        query = query.filter(DailyAttendance.date == attendance_date)
+    if session_id:
+        session = db.get(AttendanceSession, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Sesi absensi tidak ditemukan")
+        schedule = db.get(ScheduleEvent, session.schedule_event_id)
+        _require_schedule_teacher(schedule, current, db)
+        query = query.filter(
+            DailyAttendance.schedule_event_id == session.schedule_event_id,
+            DailyAttendance.date == session.session_date,
+        )
+    else:
+        if attendance_date:
+            query = query.filter(DailyAttendance.date == attendance_date)
+        if schedule_event_id:
+            query = query.filter(
+                DailyAttendance.schedule_event_id == schedule_event_id
+            )
+        if current.role == Role.GURU:
+            teacher = (
+                db.query(Teacher)
+                .filter(Teacher.user_id == current.id, Teacher.is_active.is_(True))
+                .first()
+            )
+            if not teacher:
+                return []
+            teacher_schedules = db.query(ScheduleEvent.id).filter(
+                ScheduleEvent.teacher_id == teacher.id
+            )
+            query = query.filter(
+                DailyAttendance.schedule_event_id.in_(teacher_schedules)
+            )
     if student_id:
         query = query.filter(DailyAttendance.student_id == student_id)
     return [
@@ -350,7 +522,9 @@ def list_daily(
             **DailyOut.model_validate(record).model_dump(),
             "student_name": student_name,
         }
-        for record, student_name in query.order_by(DailyAttendance.date.desc()).all()
+        for record, student_name in query.order_by(
+            DailyAttendance.date.desc(), Student.full_name
+        ).all()
     ]
 
 
@@ -443,6 +617,7 @@ def get_teacher_dashboard_stats(
             .filter(
                 DailyAttendance.student_id.in_(student_ids),
                 DailyAttendance.date == today,
+                DailyAttendance.schedule_event_id == active_sched_event.id,
             )
             .all()
             if student_ids
@@ -485,6 +660,7 @@ def get_teacher_dashboard_stats(
     all_rombel_ids = set()
     for s in all_teacher_schedules:
         all_rombel_ids.update(s.rombel_ids)
+    teacher_schedule_ids = [s.id for s in all_teacher_schedules]
 
     # Schedule attendance rates
     schedule_rates: list[ScheduleAttendanceStat] = []
@@ -502,7 +678,10 @@ def get_teacher_dashboard_stats(
         if s_student_ids:
             total_attendance_records = (
                 db.query(DailyAttendance)
-                .filter(DailyAttendance.student_id.in_(s_student_ids))
+                .filter(
+                    DailyAttendance.student_id.in_(s_student_ids),
+                    DailyAttendance.schedule_event_id == s.id,
+                )
                 .all()
             )
             total_recs = len(total_attendance_records)
@@ -548,7 +727,10 @@ def get_teacher_dashboard_stats(
         rombel = db.get(Rombel, st.rombel_id)
         records = (
             db.query(DailyAttendance)
-            .filter(DailyAttendance.student_id == st.id)
+            .filter(
+                DailyAttendance.student_id == st.id,
+                DailyAttendance.schedule_event_id.in_(teacher_schedule_ids),
+            )
             .all()
         )
         hadir_c = sum(1 for r in records if r.status == AttendanceStatus.HADIR)

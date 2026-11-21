@@ -6,7 +6,7 @@ import BarcodeScannerModal from "../components/BarcodeScannerModal";
 import ScheduleTimeWarning from "../components/ScheduleTimeWarning";
 import Toast, { ToastVariant } from "../components/Toast";
 import { api } from "../services/api";
-import type { DailyAttendance, Rombel, ScheduleEvent, Student } from "../types";
+import type { AttendanceSession, DailyAttendance, Rombel, ScheduleEvent, Student } from "../types";
 
 function attendanceError(error: any): { title: string; message: string; variant: ToastVariant } {
   const detail = String(error?.response?.data?.detail || "");
@@ -20,7 +20,6 @@ export default function Attendance() {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [scheduleId, setScheduleId] = useState("");
-  const [openedScheduleId, setOpenedScheduleId] = useState("");
   const [nisn, setNisn] = useState("");
   const [message, setMessage] = useState("");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -36,13 +35,24 @@ export default function Attendance() {
     queryFn: async () => (await api.get("/management/rombels")).data,
   });
   const selectedSchedule = schedules.data?.find((schedule) => schedule.id === scheduleId);
-  const sessionOpen = Boolean(selectedSchedule && openedScheduleId === selectedSchedule.id);
   const selectedRombelIds = selectedSchedule?.rombel_ids?.length
     ? selectedSchedule.rombel_ids
     : selectedSchedule ? [selectedSchedule.rombel_id] : [];
   const selectedRombelNames = selectedRombelIds
     .map((id) => rombels.data?.find((rombel) => rombel.id === id)?.name)
     .filter((name): name is string => Boolean(name));
+  const sessions = useQuery<AttendanceSession[]>({
+    queryKey: ["attendance-session", selectedSchedule?.id],
+    queryFn: async () => (await api.get("/attendance/daily/sessions", {
+      params: { schedule_event_id: selectedSchedule!.id },
+    })).data,
+    enabled: Boolean(selectedSchedule),
+  });
+  // The backend persists one session per schedule and date, so reloading the
+  // page (or switching back to this schedule) restores the exact same scope.
+  const session = sessions.data?.[0];
+  const sessionOpen = Boolean(session?.is_open);
+  const sessionClosed = Boolean(session && !session.is_open);
   const students = useQuery<Student[]>({
     queryKey: ["attendance-students", selectedRombelIds, q],
     queryFn: async () => {
@@ -56,18 +66,51 @@ export default function Attendance() {
     enabled: Boolean(selectedSchedule),
   });
   const logs = useQuery<DailyAttendance[]>({
-    queryKey: ["daily"],
-    queryFn: async () => (await api.get("/attendance/daily")).data,
+    queryKey: ["daily", session?.id],
+    queryFn: async () => (await api.get("/attendance/daily", {
+      params: { session_id: session!.id },
+    })).data,
+    enabled: Boolean(session),
+  });
+  const openSession = useMutation({
+    mutationFn: async (scheduleEventId: string) =>
+      (await api.post("/attendance/daily/sessions/open", { schedule_event_id: scheduleEventId })).data as AttendanceSession,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["attendance-session", data.schedule_event_id], [data]);
+      queryClient.invalidateQueries({ queryKey: ["attendance-session"] });
+      setMessage("Sesi absensi dibuka dan tersimpan untuk jadwal ini.");
+    },
+    onError: () => setToast({
+      title: "Sesi absensi gagal dibuka",
+      message: "Sesi absensi gagal dibuka. Silakan coba lagi.",
+      variant: "error",
+    }),
+  });
+  const closeSession = useMutation({
+    mutationFn: async (sessionId: string) =>
+      (await api.post(`/attendance/daily/sessions/${sessionId}/close`)).data as AttendanceSession,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["attendance-session", data.schedule_event_id], [data]);
+      queryClient.invalidateQueries({ queryKey: ["attendance-session"] });
+      queryClient.invalidateQueries({ queryKey: ["daily"] });
+      setScannerOpen(false);
+      setMessage("Sesi absensi ditutup.");
+    },
+    onError: () => setToast({
+      title: "Sesi absensi gagal ditutup",
+      message: "Sesi absensi gagal ditutup. Silakan coba lagi.",
+      variant: "error",
+    }),
   });
   const record = useMutation({
-    mutationFn: async ({ value, schedule_event_id }: { value: string; label?: string; schedule_event_id: string }) => {
-      if (!sessionOpen || !selectedSchedule || schedule_event_id !== selectedSchedule.id) {
+    mutationFn: async ({ value }: { value: string; label?: string }) => {
+      if (!sessionOpen || !session) {
         throw new Error("Buka sesi absensi sebelum mencatat kehadiran.");
       }
       const identifier = value.trim();
       const payload = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)
-        ? { schedule_event_id, id_siswa: identifier, check_in: true }
-        : { schedule_event_id, nisn: identifier, check_in: true };
+        ? { session_id: session.id, id_siswa: identifier, check_in: true }
+        : { session_id: session.id, nisn: identifier, check_in: true };
       return (await api.post("/attendance/daily/record", payload)).data as DailyAttendance & { already_recorded?: boolean };
     },
     onMutate: () => setToast(null),
@@ -75,7 +118,7 @@ export default function Attendance() {
       setNisn("");
       const label = input.label || input.value;
       const resultMessage = data.already_recorded
-        ? `${label} sudah tercatat hari ini.`
+        ? `${label} sudah tercatat pada sesi ini.`
         : data.status === "TERLAMBAT"
           ? `${label} tercatat sebagai terlambat.`
           : `${label} berhasil tercatat hadir.`;
@@ -98,7 +141,7 @@ export default function Attendance() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (sessionOpen && nisn.trim() && selectedSchedule) record.mutate({ value: nisn, schedule_event_id: selectedSchedule.id });
+    if (sessionOpen && nisn.trim()) record.mutate({ value: nisn });
   };
   const openScanner = () => {
     if (!sessionOpen || !selectedSchedule) return;
@@ -109,13 +152,13 @@ export default function Attendance() {
     if (!record.isPending) setScannerOpen(false);
   };
   const scan = useCallback(async (value: string) => {
-    if (!sessionOpen || !selectedSchedule) return;
+    if (!sessionOpen) return;
     try {
-      await record.mutateAsync({ value, schedule_event_id: selectedSchedule.id });
+      await record.mutateAsync({ value });
     } catch {
       // Mutation error handling updates the Toast and scanner message.
     }
-  }, [record, selectedSchedule, sessionOpen]);
+  }, [record, sessionOpen]);
 
   return (
     <AdminLayout title="Absensi Harian" description="Catat kehadiran dengan scan kartu atau cari siswa berdasarkan rombel dan nama.">
@@ -140,7 +183,6 @@ export default function Attendance() {
                     aria-pressed={selected}
                     onClick={() => {
                       setScheduleId(schedule.id);
-                      setOpenedScheduleId("");
                       setScannerOpen(false);
                       setQ("");
                       setNisn("");
@@ -160,18 +202,24 @@ export default function Attendance() {
             <div className="attendance-session-controls">
               <ScheduleTimeWarning schedule={selectedSchedule} />
               {sessionOpen ? (
-                <button type="button" className="attendance-session-close" onClick={() => {
-                  setOpenedScheduleId("");
-                  setScannerOpen(false);
-                }}>
+                <button type="button" className="attendance-session-close" onClick={() => session && closeSession.mutate(session.id)} disabled={closeSession.isPending}>
                   Tutup sesi absensi
                 </button>
               ) : (
-                <button type="button" onClick={() => setOpenedScheduleId(selectedSchedule.id)}>
+                <button type="button" onClick={() => openSession.mutate(selectedSchedule.id)} disabled={openSession.isPending || sessions.isLoading}>
                   Buka sesi absensi
                 </button>
               )}
-              {sessionOpen && <p className="attendance-session-open" role="status">Sesi absensi dibuka. Pemindaian dan pencatatan kehadiran tersedia.</p>}
+              {sessionOpen && (
+                <p className="attendance-session-open" role="status">
+                  Sesi absensi dibuka dan tersimpan. Pemindaian dan pencatatan kehadiran tersedia.
+                </p>
+              )}
+              {sessionClosed && (
+                <p className="muted" role="status">
+                  Sesi absensi sudah ditutup. Buka kembali sesi untuk melanjutkan pencatatan.
+                </p>
+              )}
             </div>
           )}
           {schedules.isLoading && <p className="muted">Memuat jadwal hari ini...</p>}
@@ -214,7 +262,7 @@ export default function Attendance() {
                       <td data-label="Nama">{student.full_name}</td>
                       <td data-label="NISN">{student.nisn || "-"}</td>
                       <td data-label="Aksi">
-                        <button className="button-with-icon" type="button" disabled={!sessionOpen || record.isPending} onClick={() => sessionOpen && selectedSchedule && record.mutate({ value: student.id_siswa, label: student.full_name, schedule_event_id: selectedSchedule.id })}>
+                        <button className="button-with-icon" type="button" disabled={!sessionOpen || record.isPending} onClick={() => sessionOpen && record.mutate({ value: student.id_siswa, label: student.full_name })}>
                           <Check size={14} aria-hidden="true" />Hadir
                         </button>
                       </td>
@@ -228,8 +276,18 @@ export default function Attendance() {
           </div>
 
           <div className="panel">
-            <div className="panel-heading"><div><p className="eyebrow">RIWAYAT</p><h3>Log absensi</h3></div></div>
-            {logs.data?.length ? (
+            <div className="panel-heading">
+              <div><p className="eyebrow">RIWAYAT SESI</p><h3>Log absensi sesi ini</h3></div>
+            </div>
+            {!selectedSchedule ? (
+              <p className="muted">Pilih jadwal aktif untuk melihat log sesi absensi.</p>
+            ) : !session ? (
+              <p className="muted">Belum ada sesi absensi untuk jadwal ini. Buka sesi untuk mulai mencatat.</p>
+            ) : logs.isLoading ? (
+              <p>Memuat...</p>
+            ) : logs.isError ? (
+              <p className="error">Log absensi sesi gagal dimuat.</p>
+            ) : logs.data?.length ? (
               <table>
                 <thead><tr><th>Tanggal</th><th>Siswa</th><th>Waktu absensi</th><th>Status</th></tr></thead>
                 <tbody>
@@ -243,7 +301,7 @@ export default function Attendance() {
                   ))}
                 </tbody>
               </table>
-            ) : <p className="muted">Belum ada catatan.</p>}
+            ) : <p className="muted">Belum ada catatan pada sesi ini.</p>}
           </div>
         </div>
       </div>

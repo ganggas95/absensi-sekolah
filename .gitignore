@@ -15,4 +15,5 @@ apps/frontend/playwright/.cache/
 apps/backend/test.db
 apps/backend/uploads/
 cert/*.key
+/backups/
 .DS_Store

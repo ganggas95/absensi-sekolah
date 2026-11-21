@@ -16,6 +16,7 @@ import {
     LogOut,
     Menu,
     Settings,
+    UserCheck,
     Users,
     UserRound,
     X
@@ -59,6 +60,7 @@ const adminNav: NavEntry[] = [
             {label: "Kartu Ujian", href: "/exam-cards", icon: GraduationCap},
         ]
     },
+    {label: "Absensi Guru", href: "/teacher-attendance", icon: UserCheck},
     {label: "Laporan", href: "/reports", icon: FileText},
 ];
 

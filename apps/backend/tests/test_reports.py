@@ -83,6 +83,17 @@ def test_admin_reports_filter_rows_and_export_pdf_and_xlsx():
         start_time=time(8),
         end_time=time(9),
     )
+    kbm_other = ScheduleEvent(
+        event_type=ScheduleEventType.KBM,
+        title="KBM IPA",
+        academic_year_id=year.id,
+        rombel_id=rombel.id,
+        subject_id=subject.id,
+        teacher_id=teacher.id,
+        day_of_week=0,
+        start_time=time(10),
+        end_time=time(11),
+    )
     exam = ScheduleEvent(
         event_type=ScheduleEventType.EXAM,
         title="Ujian Matematika",
@@ -95,21 +106,23 @@ def test_admin_reports_filter_rows_and_export_pdf_and_xlsx():
         start_time=time(9),
         end_time=time(10),
     )
-    session.add_all([kbm, exam])
+    session.add_all([kbm, kbm_other, exam])
     session.flush()
     session.add_all(
         [
             DailyAttendance(
                 student_id=student.id,
+                schedule_event_id=kbm.id,
                 date=date.today(),
                 check_in_time=datetime.now(timezone.utc),
                 status=AttendanceStatus.HADIR,
             ),
-            EventAttendance(
-                schedule_event_id=kbm.id,
+            DailyAttendance(
                 student_id=student.id,
-                status=EventAttendanceStatus.HADIR,
-                recorded_at=datetime.now(timezone.utc),
+                schedule_event_id=kbm_other.id,
+                date=date.today(),
+                check_in_time=datetime.now(timezone.utc),
+                status=AttendanceStatus.IZIN,
             ),
             EventAttendance(
                 schedule_event_id=exam.id,
@@ -138,6 +151,13 @@ def test_admin_reports_filter_rows_and_export_pdf_and_xlsx():
                 "status": "HADIR",
             },
         )
+        daily_all = client.get(
+            "/api/v1/reports/daily",
+            params={
+                "date_from": date.today().isoformat(),
+                "date_to": date.today().isoformat(),
+            },
+        )
         class_report = client.get(
             "/api/v1/reports/class",
             params={
@@ -146,6 +166,10 @@ def test_admin_reports_filter_rows_and_export_pdf_and_xlsx():
                 "schedule_event_id": str(kbm.id),
             },
         )
+        other_class_report = client.get(
+            "/api/v1/reports/class",
+            params={"schedule_event_id": str(kbm_other.id)},
+        )
         exam_report = client.get(
             "/api/v1/reports/exam",
             params={"exam_period_id": str(period.id), "rombel_id": str(rombel.id)},
@@ -153,16 +177,31 @@ def test_admin_reports_filter_rows_and_export_pdf_and_xlsx():
         assert (
             daily.status_code
             == class_report.status_code
+            == other_class_report.status_code
             == exam_report.status_code
             == 200
         )
-        assert (
-            daily.json()["total"]
-            == class_report.json()["total"]
-            == exam_report.json()["total"]
-            == 1
-        )
+        # The same student has one record per schedule session on the same day.
+        assert daily_all.status_code == 200
+        assert daily_all.json()["total"] == 2
+        assert daily_all.json()["summary"]["Hadir"] == 1
+        assert daily_all.json()["summary"]["Izin"] == 1
+        assert {row["subject"] for row in daily_all.json()["rows"]} == {
+            "Matematika Laporan"
+        }
+        assert {row["session"] for row in daily_all.json()["rows"]} == {
+            "KBM Matematika",
+            "KBM IPA",
+        }
+        assert daily.json()["total"] == 1
         assert daily.json()["summary"]["Hadir"] == 1
+        # Each KBM report is scoped to its own schedule session.
+        assert class_report.json()["total"] == 1
+        assert class_report.json()["rows"][0]["status"] == "HADIR"
+        assert class_report.json()["rows"][0]["session"] == "KBM Matematika"
+        assert other_class_report.json()["total"] == 1
+        assert other_class_report.json()["rows"][0]["status"] == "IZIN"
+        assert exam_report.json()["total"] == 1
         assert exam_report.json()["rows"][0]["status"] == "IZIN"
         assert (
             client.get(

@@ -254,14 +254,61 @@ class ScheduleBreak(Base):
     end_time: Mapped[time] = mapped_column(Time)
 
 
+class AttendanceSession(Base):
+    """A KBM attendance session opened by a teacher for one schedule on one date.
+
+    The session is persisted so that reopening the page restores the same
+    attendance scope, and so that two different schedules teaching the same
+    rombel on the same day never share attendance records.
+    """
+
+    __tablename__ = "attendance_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "schedule_event_id",
+            "session_date",
+            name="uq_attendance_session_schedule_date",
+        ),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    schedule_event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("schedule_events.id", ondelete="CASCADE"), index=True
+    )
+    session_date: Mapped[date] = mapped_column(Date, index=True)
+    opened_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    closed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    schedule: Mapped[ScheduleEvent] = relationship()
+
+    @property
+    def is_open(self) -> bool:
+        return self.closed_at is None
+
+
 class DailyAttendance(Base):
     __tablename__ = "daily_attendances"
     __table_args__ = (
-        UniqueConstraint("student_id", "date", name="uq_daily_student_date"),
+        UniqueConstraint(
+            "student_id",
+            "schedule_event_id",
+            "date",
+            name="uq_daily_student_schedule_date",
+        ),
     )
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     student_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("students.id", ondelete="CASCADE"), index=True
+    )
+    # NULL only for legacy rows recorded before attendance was session-scoped.
+    schedule_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("schedule_events.id", ondelete="CASCADE"), index=True
     )
     date: Mapped[date] = mapped_column(Date, index=True)
     check_in_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

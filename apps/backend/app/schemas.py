@@ -394,14 +394,30 @@ class EventAttendanceOut(BaseModel):
 
 
 class DailyRecord(BaseModel):
-    schedule_event_id: uuid.UUID
+    session_id: uuid.UUID
     id_siswa: uuid.UUID | None = None
     student_id: uuid.UUID | None = None
     nisn: str | None = None
-    date: date_type | None = None
     check_in: bool = True
     status: AttendanceStatus = AttendanceStatus.HADIR
     notes: str | None = None
+
+
+class AttendanceSessionOpen(BaseModel):
+    schedule_event_id: uuid.UUID
+
+
+class AttendanceSessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    schedule_event_id: uuid.UUID
+    session_date: date_type
+    opened_by: uuid.UUID | None
+    opened_by_name: str | None = None
+    opened_at: datetime
+    closed_by: uuid.UUID | None
+    closed_at: datetime | None
+    is_open: bool
 
 
 class AttendanceConfigOut(BaseModel):
@@ -421,6 +437,7 @@ class DailyOut(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
     student_name: str | None = None
+    schedule_event_id: uuid.UUID | None = None
     date: date_type
     check_in_time: datetime | None
     check_out_time: datetime | None

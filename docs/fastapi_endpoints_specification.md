@@ -109,13 +109,19 @@ GET /config: Get active daily attendance time configuration.
 
 GET /daily/schedules: List today's KBM schedules in the active academic year. Guru users see only their own schedules.
 
-POST /daily/record: Record daily attendance (supports `id_siswa` UUID QR/barcode payload and legacy NISN lookup). Requires `schedule_event_id`; the schedule must be today's active KBM schedule, belong to the current teacher when applicable, and match the student's rombel.
+POST /daily/sessions/open: Open the KBM attendance session for a schedule today. The session is persisted (unique per `schedule_event_id` and date) and idempotent: repeating it returns the same session, and a closed session is reopened. Guru users may only open sessions for their own schedules (403 otherwise). Returns the session with `is_open`.
 
-POST /event/record: Marking attendance for KBM or Exam sessions.
+GET /daily/sessions: List attendance sessions for a date (default today), optionally filtered by `schedule_event_id`. Guru users only see sessions of their own schedules; admins see all.
 
-GET /daily: Get daily attendance logs.
+POST /daily/sessions/{session_id}/close: Close an attendance session. Only the schedule's teacher or an admin may close it. Repeating is idempotent.
 
-GET /event/{schedule_event_id}: Get attendance list for a specific class/exam session.
+POST /daily/record: Record attendance inside an open session (supports `id_siswa` UUID QR/barcode payload and legacy NISN lookup). Requires `session_id`; the session must be open and for today, its schedule must be today's active KBM schedule and belong to the current teacher when applicable, and the student must be in the schedule's rombel. The record is stored against that schedule session, so the same student can be recorded once per schedule session per day. Recording into a closed session returns 422. A repeated scan inside the same session returns the existing record with `already_recorded: true`.
+
+GET /daily: Get daily attendance logs. Optional `attendance_date`, `student_id`, `schedule_event_id`, and `session_id`. Guru users only see records from their own schedule sessions; passing another teacher's `session_id` returns 403.
+
+POST /event/record: Record exam attendance for an EXAM schedule session.
+
+GET /event/{schedule_event_id}: Get exam attendance for a specific exam session.
 
 Teacher Attendance (`/api/v1/attendance/teacher`): guru check in before entering class and check out after teaching, from the mobile app. Only days on which the guru has an active-year KBM schedule are eligible. Time always comes from the server (Asia/Makassar); the client sends no time.
 
@@ -135,8 +141,8 @@ Reports Router (/api/v1/reports)
 
 All report routes are Admin-only. `GET /daily`, `/class`, and `/exam` return filtered rows with total and status summaries; the corresponding `/export` routes accept `format=pdf|xlsx` (default `pdf`) and return a downloadable file. All report rows reflect recorded attendance only; students without a record are not inferred as absent.
 
-- Daily: optional `date_from`, `date_to`, `rombel_id`, `student_id`, and attendance `status`.
-- KBM/Class: optional `date_from`, `date_to`, `rombel_id`, `student_id`, `subject_id`, and `schedule_event_id`. Dates refer to the local attendance-record date in Asia/Makassar.
+- Daily: optional `date_from`, `date_to`, `rombel_id`, `student_id`, and attendance `status`. Rows include the subject and schedule session of each KBM record.
+- KBM/Class: optional `date_from`, `date_to`, `rombel_id`, `student_id`, `subject_id`, and `schedule_event_id`, read from session-scoped KBM records. Dates refer to the local attendance-record date in Asia/Makassar.
 - Exam: optional `date_from`, `date_to`, `rombel_id`, `student_id`, `subject_id`, `schedule_event_id`, and `exam_period_id`. Dates refer to the scheduled exam date.
 
 Start and end dates are inclusive. If both are supplied, the start date must not be after the end date.

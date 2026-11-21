@@ -110,12 +110,27 @@ def _daily_rows(
     rombel_id: UUID | None,
     student_id: UUID | None,
     status: AttendanceStatus | None,
+    subject_id: UUID | None = None,
+    schedule_event_id: UUID | None = None,
+    kbm_only: bool = False,
 ) -> list[dict[str, str]]:
+    """Rows of session-scoped KBM attendance.
+
+    Each schedule session stores its own records, so the same student can
+    appear once per schedule on the same day without mixing teachers.
+    """
+
     query = (
-        db.query(DailyAttendance, Student, Rombel)
+        db.query(DailyAttendance, Student, Rombel, ScheduleEvent, Subject)
         .join(Student, Student.id == DailyAttendance.student_id)
         .outerjoin(Rombel, Rombel.id == Student.rombel_id)
+        .outerjoin(
+            ScheduleEvent, ScheduleEvent.id == DailyAttendance.schedule_event_id
+        )
+        .outerjoin(Subject, Subject.id == ScheduleEvent.subject_id)
     )
+    if kbm_only:
+        query = query.filter(ScheduleEvent.event_type == ScheduleEventType.KBM)
     if date_from:
         query = query.filter(DailyAttendance.date >= date_from)
     if date_to:
@@ -126,18 +141,26 @@ def _daily_rows(
         query = query.filter(Student.id == student_id)
     if status:
         query = query.filter(DailyAttendance.status == status)
-    entries = query.order_by(DailyAttendance.date.desc(), Student.full_name).all()
+    if subject_id:
+        query = query.filter(ScheduleEvent.subject_id == subject_id)
+    if schedule_event_id:
+        query = query.filter(DailyAttendance.schedule_event_id == schedule_event_id)
+    entries = query.order_by(
+        DailyAttendance.date.desc(), Student.full_name, ScheduleEvent.start_time
+    ).all()
     return [
         _row(
             attendance_date=attendance.date,
             student=student,
             rombel=rombel,
+            subject=subject,
+            session=schedule.title if schedule else "",
             status=attendance.status.value,
             check_in=attendance.check_in_time,
             check_out=attendance.check_out_time,
             notes=attendance.notes,
         )
-        for attendance, student, rombel in entries
+        for attendance, student, rombel, schedule, subject in entries
     ]
 
 
@@ -331,15 +354,16 @@ def class_report(
     db: Session = Depends(get_db),
 ):
     _validate_dates(date_from, date_to)
-    rows = _event_rows(
+    rows = _daily_rows(
         db,
-        ScheduleEventType.KBM,
         date_from,
         date_to,
         rombel_id,
         student_id,
-        subject_id,
-        schedule_event_id,
+        status=None,
+        subject_id=subject_id,
+        schedule_event_id=schedule_event_id,
+        kbm_only=True,
     )
     return _report(rows)
 
@@ -357,15 +381,16 @@ def export_class_report(
     db: Session = Depends(get_db),
 ):
     _validate_dates(date_from, date_to)
-    rows = _event_rows(
+    rows = _daily_rows(
         db,
-        ScheduleEventType.KBM,
         date_from,
         date_to,
         rombel_id,
         student_id,
-        subject_id,
-        schedule_event_id,
+        status=None,
+        subject_id=subject_id,
+        schedule_event_id=schedule_event_id,
+        kbm_only=True,
     )
     return _report_response(rows, file_type, "laporan-absensi-kbm")
 

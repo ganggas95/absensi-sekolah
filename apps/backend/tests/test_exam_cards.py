@@ -709,10 +709,16 @@ def test_daily_attendance_uses_schedule_lateness_and_limits_teacher_to_own_class
     client = TestClient(app)
     try:
         teacher_schedules = client.get("/api/v1/attendance/daily/schedules")
+        opened = client.post(
+            "/api/v1/attendance/daily/sessions/open",
+            json={"schedule_event_id": str(teacher_schedule.id)},
+        )
+        assert opened.status_code == 200
+        daily_session_id = opened.json()["id"]
         recorded = client.post(
             "/api/v1/attendance/daily/record",
             json={
-                "schedule_event_id": str(teacher_schedule.id),
+                "session_id": daily_session_id,
                 "id_siswa": str(student.id),
             },
         )
@@ -721,14 +727,14 @@ def test_daily_attendance_uses_schedule_lateness_and_limits_teacher_to_own_class
         recorded_other_class = client.post(
             "/api/v1/attendance/daily/record",
             json={
-                "schedule_event_id": str(teacher_schedule.id),
+                "session_id": daily_session_id,
                 "id_siswa": str(other_student.id),
             },
         )
         wrong_class = client.post(
             "/api/v1/attendance/daily/record",
             json={
-                "schedule_event_id": str(teacher_schedule.id),
+                "session_id": daily_session_id,
                 "id_siswa": str(unrelated_student.id),
             },
         )
@@ -742,9 +748,37 @@ def test_daily_attendance_uses_schedule_lateness_and_limits_teacher_to_own_class
         recorded_without_config = client.post(
             "/api/v1/attendance/daily/record",
             json={
-                "schedule_event_id": str(teacher_schedule.id),
+                "session_id": daily_session_id,
                 "id_siswa": str(fallback_student.id),
             },
+        )
+        # Another teacher can neither open nor use this schedule's session.
+        app.dependency_overrides[current_user] = lambda: other_teacher_user
+        forbidden_open = client.post(
+            "/api/v1/attendance/daily/sessions/open",
+            json={"schedule_event_id": str(teacher_schedule.id)},
+        )
+        forbidden_record = client.post(
+            "/api/v1/attendance/daily/record",
+            json={"session_id": daily_session_id, "id_siswa": str(student.id)},
+        )
+        other_teacher_sessions = client.get("/api/v1/attendance/daily/sessions")
+        # Reopening the page restores the persisted session instead of a new one.
+        app.dependency_overrides[current_user] = lambda: teacher_user
+        restored = client.get("/api/v1/attendance/daily/sessions")
+        closed = client.post(
+            f"/api/v1/attendance/daily/sessions/{daily_session_id}/close"
+        )
+        record_after_close = client.post(
+            "/api/v1/attendance/daily/record",
+            json={"session_id": daily_session_id, "id_siswa": str(fallback_student.id)},
+        )
+        reopened = client.post(
+            "/api/v1/attendance/daily/sessions/open",
+            json={"schedule_event_id": str(teacher_schedule.id)},
+        )
+        session_logs = client.get(
+            "/api/v1/attendance/daily", params={"session_id": daily_session_id}
         )
         app.dependency_overrides[current_user] = lambda: admin_user
         admin_schedules = client.get("/api/v1/attendance/daily/schedules")
@@ -764,6 +798,23 @@ def test_daily_attendance_uses_schedule_lateness_and_limits_teacher_to_own_class
         assert recorded_without_config.json()["status"] == "TERLAMBAT"
         assert wrong_class.status_code == 422
         assert missing_schedule.status_code == 422
+        assert forbidden_open.status_code == 403
+        assert forbidden_record.status_code == 403
+        assert other_teacher_sessions.json() == []
+        assert [item["id"] for item in restored.json()] == [daily_session_id]
+        assert restored.json()[0]["is_open"] is True
+        assert closed.status_code == 200
+        assert closed.json()["is_open"] is False
+        assert record_after_close.status_code == 422
+        assert record_after_close.json()["detail"] == "Sesi absensi sudah ditutup"
+        assert reopened.status_code == 200
+        assert reopened.json()["id"] == daily_session_id
+        assert reopened.json()["is_open"] is True
+        assert {row["student_id"] for row in session_logs.json()} == {
+            str(student.id),
+            str(other_student.id),
+            str(fallback_student.id),
+        }
         assert {item["id"] for item in admin_schedules.json()} == {
             str(teacher_schedule.id),
             str(other_schedule.id),

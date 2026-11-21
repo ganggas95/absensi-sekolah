@@ -1,12 +1,21 @@
 import { expect, test } from "@playwright/test";
 
-async function login(page: import("@playwright/test").Page) {
+async function loginAs(
+  page: import("@playwright/test").Page,
+  username: string,
+  password: string,
+  url: RegExp,
+) {
   await page.goto("/login");
-  await page.getByLabel("Username", { exact: true }).fill("e2e-admin");
-  await page.getByLabel("Password", { exact: true }).fill("e2e-admin-pass");
+  await page.getByLabel("Username", { exact: true }).fill(username);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Masuk ke dashboard" }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(url);
   await expect(page.getByRole("navigation")).toBeVisible();
+}
+
+async function login(page: import("@playwright/test").Page) {
+  await loginAs(page, "e2e-admin", "e2e-admin-pass", /\/admin$/);
 }
 
 const authHeaders = (token: string) => ({ Authorization: "Bearer " + token });
@@ -590,7 +599,7 @@ test("records daily and exam attendance through the staff pages", async ({ page 
     .getByRole("cell", { name: /^Waktu absensi:/ })).toContainText(/\d{2}\.\d{2}/);
   await page.getByRole("row").filter({ hasText: "E2E Siswa" })
     .getByRole("button", { name: "Hadir", exact: true }).click();
-  await expect(page.locator(".inline-message")).toContainText("E2E Siswa sudah tercatat hari ini.");
+  await expect(page.locator(".inline-message")).toContainText("E2E Siswa sudah tercatat pada sesi ini.");
 
   await page.goto("/admin");
   await expect(page.getByRole("cell", { name: /E2E Siswa/ })).toBeVisible();
@@ -605,6 +614,127 @@ test("records daily and exam attendance through the staff pages", async ({ page 
   await page.getByRole("row").filter({ hasText: "E2E Siswa" })
     .getByRole("button", { name: "Hadir", exact: true }).click();
   await expect(page.getByText("HADIR").first()).toBeVisible();
+});
+
+test("keeps attendance sessions separate for different teachers on the same rombel and day", async ({ page }) => {
+  const token = await page.evaluate(() => localStorage.getItem("access_token"));
+  if (!token) throw new Error("Admin access token is missing.");
+  const headers = authHeaders(token);
+  const create = async (path: string, data: Record<string, string | number | boolean | string[]>) => {
+    const response = await page.request.post(`http://127.0.0.1:18001/api/v1${path}`, {
+      headers,
+      data,
+    });
+    expect(response.status()).toBe(201);
+    return response.json();
+  };
+
+  const suffix = Date.now().toString().slice(-6);
+  const years = await (await page.request.get("http://127.0.0.1:18001/api/v1/management/academic-years", { headers })).json();
+  const year = years.find((item: { is_active: boolean }) => item.is_active);
+  expect(year).toBeTruthy();
+  const subjects = await (await page.request.get("http://127.0.0.1:18001/api/v1/management/subjects", { headers })).json();
+  const subject = subjects.find((item: { code: string }) => item.code === "E2E-MTK");
+  expect(subject).toBeTruthy();
+  const teachers = await (await page.request.get("http://127.0.0.1:18001/api/v1/management/teachers", { headers })).json();
+  const firstTeacher = teachers.find((item: { full_name: string }) => item.full_name === "E2E Guru");
+  expect(firstTeacher).toBeTruthy();
+
+  const rombel = await create("/management/rombels", {
+    name: `Sesi Rombel ${suffix}`,
+    academic_year_id: year.id,
+  });
+  const student = await create("/management/students", {
+    full_name: `Sesi Siswa ${suffix}`,
+    rombel_id: rombel.id,
+  });
+  const secondUsername = `sesi-${suffix}`;
+  const secondUser = await create("/management/users", {
+    username: secondUsername,
+    password: "sesi-teacher-pass",
+    full_name: `Guru Sesi ${suffix}`,
+    role: "GURU",
+  });
+  const secondTeacher = await create("/management/teachers", { user_id: secondUser.id });
+  const assigned = await page.request.put(
+    `http://127.0.0.1:18001/api/v1/management/teachers/${secondTeacher.id}/subjects`,
+    { headers, data: { subject_ids: [subject.id] } },
+  );
+  expect(assigned.status()).toBe(200);
+
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Makassar",
+    weekday: "short",
+  }).format(new Date());
+  const dayOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday);
+  const scheduleFields = {
+    event_type: "KBM",
+    academic_year_id: year.id,
+    rombel_id: rombel.id,
+    subject_id: subject.id,
+    day_of_week: dayOfWeek,
+  };
+  const firstScheduleTitle = `Sesi Pagi ${suffix}`;
+  const secondScheduleTitle = `Sesi Siang ${suffix}`;
+  await create("/schedules/events", {
+    ...scheduleFields,
+    title: firstScheduleTitle,
+    teacher_id: firstTeacher.id,
+    start_time: "11:00:00",
+    end_time: "12:00:00",
+  });
+  await create("/schedules/events", {
+    ...scheduleFields,
+    title: secondScheduleTitle,
+    teacher_id: secondTeacher.id,
+    start_time: "13:00:00",
+    end_time: "14:00:00",
+  });
+
+  const sessionLogRows = () => page.locator(".panel")
+    .filter({ hasText: "Log absensi sesi ini" })
+    .locator("tbody tr");
+
+  // First teacher opens the session, records the student, and reloads.
+  await loginAs(page, "e2e-guru", "e2e-guru-pass", /\/attendance$/);
+  await page.goto("/attendance");
+  await page.getByRole("button", { name: new RegExp(firstScheduleTitle) }).click();
+  await page.getByRole("button", { name: "Buka sesi absensi" }).click();
+  await expect(page.getByText("Sesi absensi dibuka dan tersimpan.")).toBeVisible();
+  const firstRecord = page.waitForResponse((response) =>
+    response.request().method() === "POST" && response.url().endsWith("/api/v1/attendance/daily/record"),
+  );
+  await page.getByRole("row").filter({ hasText: student.full_name })
+    .getByRole("button", { name: "Hadir", exact: true }).click();
+  expect((await firstRecord).status()).toBe(200);
+  await expect(sessionLogRows()).toHaveCount(1);
+  await expect(sessionLogRows().first()).toContainText(student.full_name);
+  await page.reload();
+  await page.getByRole("button", { name: new RegExp(firstScheduleTitle) }).click();
+  await expect(page.getByRole("button", { name: "Tutup sesi absensi" })).toBeVisible();
+  await expect(sessionLogRows()).toHaveCount(1);
+
+  // The second teacher must not inherit the first teacher's session or records.
+  await loginAs(page, secondUsername, "sesi-teacher-pass", /\/attendance$/);
+  await page.goto("/attendance");
+  await page.getByRole("button", { name: new RegExp(secondScheduleTitle) }).click();
+  await expect(page.getByText("Belum ada sesi absensi untuk jadwal ini.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tutup sesi absensi" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Buka sesi absensi" }).click();
+  await expect(page.getByText("Belum ada catatan pada sesi ini.")).toBeVisible();
+  const secondRecord = page.waitForResponse((response) =>
+    response.request().method() === "POST" && response.url().endsWith("/api/v1/attendance/daily/record"),
+  );
+  await page.getByRole("row").filter({ hasText: student.full_name })
+    .getByRole("button", { name: "Hadir", exact: true }).click();
+  expect((await secondRecord).status()).toBe(200);
+  await expect(page.locator(".inline-message")).toContainText(student.full_name);
+  await expect(page.locator(".inline-message")).not.toContainText("sudah tercatat");
+  await page.reload();
+  await page.getByRole("button", { name: new RegExp(secondScheduleTitle) }).click();
+  await expect(page.getByRole("button", { name: "Tutup sesi absensi" })).toBeVisible();
+  await expect(sessionLogRows()).toHaveCount(1);
+  await expect(sessionLogRows().first()).toContainText(student.full_name);
 });
 
 test("shows a clear error when today's attendance schedules fail to load", async ({ page }) => {

@@ -36,8 +36,8 @@ export default function Login() {
     }
 
     return (
-        <main className="login-page grid min-h-screen lg:grid-cols-2">
-            <section className="login-showcase flex flex-col p-6 md:p-10">
+        <main className="login-page">
+            <section className="login-showcase">
                 <div className="login-brand">
                     <span className="login-brand-mark">
                         <img src="/logo.png" alt="Logo SMPI Bina Cendekia Aqwam" />
@@ -75,8 +75,8 @@ export default function Login() {
                 <p className="login-showcase-footer">Absensi Siswa SMPI · Bina Cendekia Aqwam</p>
             </section>
 
-            <section className="login-form-area flex items-center justify-center p-4 md:p-8">
-                <form className="login-card w-full max-w-md" onSubmit={submit}>
+            <section className="login-form-area">
+                <form className="login-card" onSubmit={submit}>
                     <div className="login-form-heading">
                         <span className="login-mobile-mark">
                             <img src="/logo.png" alt="Logo SMPI Bina Cendekia Aqwam" />
@@ -86,7 +86,7 @@ export default function Login() {
                         <p>Gunakan akun admin atau guru untuk melanjutkan.</p>
                     </div>
 
-                    <div className="login-fields grid gap-3">
+                    <div className="login-fields">
                         <label htmlFor="username">
                             Username
                             <div className="login-input-wrap">

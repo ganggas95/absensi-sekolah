@@ -139,6 +139,7 @@ def main() -> None:
             [
                 DailyAttendance(
                     student_id=report_student.id,
+                    schedule_event_id=kbm.id,
                     date=today,
                     check_in_time=now.astimezone(ZoneInfo("UTC")),
                     status=AttendanceStatus.HADIR,
@@ -151,12 +152,6 @@ def main() -> None:
                     check_in_ip="10.0.0.7",
                     status=AttendanceStatus.TERLAMBAT,
                     notes="Fixture absensi guru",
-                ),
-                EventAttendance(
-                    schedule_event_id=kbm.id,
-                    student_id=report_student.id,
-                    status=EventAttendanceStatus.HADIR,
-                    notes="Fixture laporan KBM",
                 ),
                 EventAttendance(
                     schedule_event_id=exam.id,
